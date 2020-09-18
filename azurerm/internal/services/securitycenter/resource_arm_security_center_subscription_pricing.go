@@ -5,17 +5,13 @@ import (
 	"log"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/preview/security/mgmt/v1.0/security"
+	"github.com/Azure/azure-sdk-for-go/services/preview/security/mgmt/v3.0/security"
 	"github.com/hashicorp/terraform-plugin-sdk/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/helper/validation"
 	"github.com/terraform-providers/terraform-provider-azurerm/azurerm/internal/clients"
 	"github.com/terraform-providers/terraform-provider-azurerm/azurerm/internal/timeouts"
 	"github.com/terraform-providers/terraform-provider-azurerm/azurerm/utils"
 )
-
-// NOTE: seems default is the only valid pricing name:
-// Code="InvalidInputJson" Message="Pricing name 'kt's price' is not allowed. Expected 'default' for this scope."
-const securityCenterSubscriptionPricingName = "default"
 
 func resourceArmSecurityCenterSubscriptionPricing() *schema.Resource {
 	return &schema.Resource{
@@ -44,6 +40,20 @@ func resourceArmSecurityCenterSubscriptionPricing() *schema.Resource {
 					string(security.Standard),
 				}, false),
 			},
+			"resource_type": {
+				Type:     schema.TypeString,
+				Required: true,
+				ValidateFunc: validation.StringInSlice([]string{
+					"AppServices",
+					"ContainerRegistry",
+					"KeyVaults",
+					"KubernetesService",
+					"SqlServers",
+					"SqlServerVirtualMachines",
+					"StorageAccounts",
+					"VirtualMachines",
+				}, false),
+			},
 		},
 	}
 }
@@ -52,8 +62,6 @@ func resourceArmSecurityCenterSubscriptionPricingUpdate(d *schema.ResourceData, 
 	client := meta.(*clients.Client).SecurityCenter.PricingClient
 	ctx, cancel := timeouts.ForUpdate(meta.(*clients.Client).StopContext, d)
 	defer cancel()
-
-	name := securityCenterSubscriptionPricingName
 
 	// not doing import check as afaik it always exists (cannot be deleted)
 	// all this resource does is flip a boolean
@@ -64,11 +72,13 @@ func resourceArmSecurityCenterSubscriptionPricingUpdate(d *schema.ResourceData, 
 		},
 	}
 
-	if _, err := client.UpdateSubscriptionPricing(ctx, name, pricing); err != nil {
+	resource_type := d.Get("resource_type").(string)
+
+	if _, err := client.Update(ctx, resource_type, pricing); err != nil {
 		return fmt.Errorf("Error creating/updating Security Center Subscription pricing: %+v", err)
 	}
 
-	resp, err := client.GetSubscriptionPricing(ctx, name)
+	resp, err := client.Get(ctx, resource_type)
 	if err != nil {
 		return fmt.Errorf("Error reading Security Center Subscription pricing: %+v", err)
 	}
@@ -86,15 +96,17 @@ func resourceArmSecurityCenterSubscriptionPricingRead(d *schema.ResourceData, me
 	ctx, cancel := timeouts.ForRead(meta.(*clients.Client).StopContext, d)
 	defer cancel()
 
-	resp, err := client.GetSubscriptionPricing(ctx, securityCenterSubscriptionPricingName)
+	resource_type := d.Get("resource_type").(string)
+
+	resp, err := client.Get(ctx, resource_type)
 	if err != nil {
 		if utils.ResponseWasNotFound(resp.Response) {
-			log.Printf("[DEBUG] Security Center Subscription was not found: %v", err)
+			log.Printf("[DEBUG] %v Security Center Subscription was not found: %v", resource_type, err)
 			d.SetId("")
 			return nil
 		}
 
-		return fmt.Errorf("Error reading Security Center Subscription pricing: %+v", err)
+		return fmt.Errorf("Error reading %v Security Center Subscription pricing: %+v", resource_type, err)
 	}
 
 	if properties := resp.PricingProperties; properties != nil {
