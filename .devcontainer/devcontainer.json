@@ -1,0 +1,38 @@
+// For format details, see https://aka.ms/vscode-remote/devcontainer.json or this file's README at:
+// https://github.com/microsoft/vscode-dev-containers/tree/v0.134.1/containers/ubuntu
+{
+	"name": "Terraform Provider AzureRM",
+	"build": {
+		"dockerfile": "Dockerfile",
+	},
+	"runArgs": [
+		"-v",
+		"${env:HOME}${env:USERPROFILE}/.ssh:/root/.ssh-localhost:ro",
+		"--env-file", ".env.sh",
+	],
+	"postCreateCommand": "mkdir -p /root/.ssh && cp -r /root/.ssh-localhost/* /root/.ssh && chmod 700 /root/.ssh && chmod 600 /root/.ssh/*",
+
+	// Set *default* container specific settings.json values on container create.
+	"settings": { 
+		"terminal.integrated.shell.linux": "/bin/bash",
+	},
+
+	// Add the IDs of extensions you want installed when the container is created.
+	"extensions": [
+		"golang.go",
+		"streetsidesoftware.code-spell-checker",
+		"eamodio.gitlens",
+		"yzhang.markdown-all-in-one",
+		"davidanson.vscode-markdownlint"
+	]
+
+	// Use 'forwardPorts' to make a list of ports inside the container available locally.
+	// "forwardPorts": [],
+
+	// Use 'postCreateCommand' to run commands after the container is created.
+	// "postCreateCommand": "uname -a",
+
+	// Uncomment to connect as a non-root user. See https://aka.ms/vscode-remote/containers/non-root.
+	// "remoteUser": "vscode"
+	
+}
