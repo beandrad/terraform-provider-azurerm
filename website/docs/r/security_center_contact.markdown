@@ -11,11 +11,13 @@ description: |-
 Manages the subscription's Security Center Contact.
 
 ~> **NOTE:** Owner access permission is required.
+~> **NOTE:** When creating/updating this resource, the value assigned to `phone`, `alert_notifications` and `alert_to_admins` apply to all the resources of the `azurerm_security_center_contact` under the same resource. This is a problem of the Azure REST API which should be solved in future releases.
 
 ## Example Usage
 
 ```hcl
 resource "azurerm_security_center_contact" "example" {
+  name  = "main"
   email = "contact@example.com"
   phone = "+1-555-555-5555"
 
@@ -28,6 +30,7 @@ resource "azurerm_security_center_contact" "example" {
 
 The following arguments are supported:
 
+* `name` - (Optional) The name of the Security Center Contact resource. Defaults to `default1`.
 * `email` - (Required) The email of the Security Center Contact.
 * `phone` - (Optional) The phone number of the Security Center Contact.
 * `alert_notifications` - (Required) Whether to send security alerts notifications to the security contact.
@@ -54,5 +57,5 @@ The `timeouts` block allows you to specify [timeouts](https://www.terraform.io/d
 The contact can be imported using the `resource id`, e.g.
 
 ```shell
-terraform import azurerm_security_center_contact.example /subscriptions/00000000-0000-0000-0000-000000000000/providers/Microsoft.Security/securityContacts/default1
+terraform import azurerm_security_center_contact.example /subscriptions/00000000-0000-0000-0000-000000000000/providers/Microsoft.Security/securityContact/<name>
 ```

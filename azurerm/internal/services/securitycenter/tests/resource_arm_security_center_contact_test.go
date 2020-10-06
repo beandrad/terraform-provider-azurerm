@@ -44,7 +44,7 @@ func testAccAzureRMSecurityCenterContact_basic(t *testing.T) {
 		CheckDestroy: testCheckAzureRMSecurityCenterContactDestroy,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccAzureRMSecurityCenterContact_template("basic@example.com", "+1-555-555-5555", true, true),
+				Config: testAccAzureRMSecurityCenterContact_template("default", "basic@example.com", "+1-555-555-5555", true, true),
 				Check: resource.ComposeTestCheckFunc(
 					testCheckAzureRMSecurityCenterContactExists(data.ResourceName),
 					resource.TestCheckResourceAttr(data.ResourceName, "email", "basic@example.com"),
@@ -66,7 +66,7 @@ func testAccAzureRMSecurityCenterContact_requiresImport(t *testing.T) {
 		CheckDestroy: testCheckAzureRMSecurityCenterContactDestroy,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccAzureRMSecurityCenterContact_template("require@example.com", "+1-555-555-5555", true, true),
+				Config: testAccAzureRMSecurityCenterContact_template("default", "require@example.com", "+1-555-555-5555", true, true),
 				Check: resource.ComposeTestCheckFunc(
 					testCheckAzureRMSecurityCenterContactExists(data.ResourceName),
 					resource.TestCheckResourceAttr(data.ResourceName, "email", "require@example.com"),
@@ -76,7 +76,7 @@ func testAccAzureRMSecurityCenterContact_requiresImport(t *testing.T) {
 				),
 			},
 			data.RequiresImportErrorStep(func(data acceptance.TestData) string {
-				return testAccAzureRMSecurityCenterContact_requiresImportCfg("email1@example.com", "+1-555-555-5555", true, true)
+				return testAccAzureRMSecurityCenterContact_requiresImportCfg("default", "email1@example.com", "+1-555-555-5555", true, true)
 			}),
 		},
 	})
@@ -91,7 +91,7 @@ func testAccAzureRMSecurityCenterContact_update(t *testing.T) {
 		CheckDestroy: testCheckAzureRMSecurityCenterContactDestroy,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccAzureRMSecurityCenterContact_template("update@example.com", "+1-555-555-5555", true, true),
+				Config: testAccAzureRMSecurityCenterContact_template("default", "update@example.com", "+1-555-555-5555", true, true),
 				Check: resource.ComposeTestCheckFunc(
 					testCheckAzureRMSecurityCenterContactExists(data.ResourceName),
 					resource.TestCheckResourceAttr(data.ResourceName, "email", "update@example.com"),
@@ -101,10 +101,30 @@ func testAccAzureRMSecurityCenterContact_update(t *testing.T) {
 				),
 			},
 			{
-				Config: testAccAzureRMSecurityCenterContact_template("updated@example.com", "+1-555-678-6789", false, false),
+				Config: testAccAzureRMSecurityCenterContact_template("default", "updated@example.com", "+1-555-678-6789", false, false),
 				Check: resource.ComposeTestCheckFunc(
 					testCheckAzureRMSecurityCenterContactExists(data.ResourceName),
 					resource.TestCheckResourceAttr(data.ResourceName, "email", "updated@example.com"),
+					resource.TestCheckResourceAttr(data.ResourceName, "phone", "+1-555-678-6789"),
+					resource.TestCheckResourceAttr(data.ResourceName, "alert_notifications", "false"),
+					resource.TestCheckResourceAttr(data.ResourceName, "alerts_to_admins", "false"),
+				),
+			},
+			{
+				Config: testAccAzureRMSecurityCenterContact_template("default", "updated1@example.com", "+1-555-678-6789", false, false),
+				Check: resource.ComposeTestCheckFunc(
+					testCheckAzureRMSecurityCenterContactExists(data.ResourceName),
+					resource.TestCheckResourceAttr(data.ResourceName, "email", "updated1@example.com"),
+					resource.TestCheckResourceAttr(data.ResourceName, "phone", "+1-555-678-6789"),
+					resource.TestCheckResourceAttr(data.ResourceName, "alert_notifications", "false"),
+					resource.TestCheckResourceAttr(data.ResourceName, "alerts_to_admins", "false"),
+				),
+			},
+			{
+				Config: testAccAzureRMSecurityCenterContact_template("default1", "updated1@example.com", "+1-555-678-6789", false, false),
+				Check: resource.ComposeTestCheckFunc(
+					testCheckAzureRMSecurityCenterContactExists(data.ResourceName),
+					resource.TestCheckResourceAttr(data.ResourceName, "email", "updated1@example.com"),
 					resource.TestCheckResourceAttr(data.ResourceName, "phone", "+1-555-678-6789"),
 					resource.TestCheckResourceAttr(data.ResourceName, "alert_notifications", "false"),
 					resource.TestCheckResourceAttr(data.ResourceName, "alerts_to_admins", "false"),
@@ -182,20 +202,21 @@ func testCheckAzureRMSecurityCenterContactDestroy(s *terraform.State) error {
 	return nil
 }
 
-func testAccAzureRMSecurityCenterContact_template(email, phone string, notifications, adminAlerts bool) string {
+func testAccAzureRMSecurityCenterContact_template(name string, email string, phone string, notifications, adminAlerts bool) string {
 	return fmt.Sprintf(`
 provider "azurerm" {
   features {}
 }
 
 resource "azurerm_security_center_contact" "test" {
+  name  = "%s"
   email = "%s"
   phone = "%s"
 
   alert_notifications = %t
   alerts_to_admins    = %t
 }
-`, email, phone, notifications, adminAlerts)
+`, name, email, phone, notifications, adminAlerts)
 }
 
 func testAccAzureRMSecurityCenterContact_templateWithoutPhone(email string, notifications, adminAlerts bool) string {
@@ -213,12 +234,13 @@ resource "azurerm_security_center_contact" "test" {
 `, email, notifications, adminAlerts)
 }
 
-func testAccAzureRMSecurityCenterContact_requiresImportCfg(email, phone string, notifications, adminAlerts bool) string {
-	template := testAccAzureRMSecurityCenterContact_template(email, phone, notifications, adminAlerts)
+func testAccAzureRMSecurityCenterContact_requiresImportCfg(name, email, phone string, notifications, adminAlerts bool) string {
+	template := testAccAzureRMSecurityCenterContact_template(name, email, phone, notifications, adminAlerts)
 	return fmt.Sprintf(`
 %s
 
 resource "azurerm_security_center_contact" "import" {
+  name  = azurerm_security_center_contact.test.name
   email = azurerm_security_center_contact.test.email
   phone = azurerm_security_center_contact.test.phone
 

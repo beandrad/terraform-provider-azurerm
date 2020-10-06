@@ -11,14 +11,12 @@ import (
 	"github.com/terraform-providers/terraform-provider-azurerm/azurerm/helpers/tf"
 	"github.com/terraform-providers/terraform-provider-azurerm/azurerm/internal/clients"
 	"github.com/terraform-providers/terraform-provider-azurerm/azurerm/internal/services/securitycenter/azuresdkhacks"
+	"github.com/terraform-providers/terraform-provider-azurerm/azurerm/internal/services/securitycenter/parse"
 	"github.com/terraform-providers/terraform-provider-azurerm/azurerm/internal/timeouts"
 	"github.com/terraform-providers/terraform-provider-azurerm/azurerm/utils"
 )
 
-// seems you can only set one contact:
-// Invalid security contact name was provided - only 'defaultX' is allowed where X is an index
-// Invalid security contact name 'default0' was provided. Expected 'default1'
-// Message="Invalid security contact name 'default2' was provided. Expected 'default1'"
+// default name to keep resource backwards compatible
 const securityCenterContactName = "default1"
 
 func resourceArmSecurityCenterContact() *schema.Resource {
@@ -39,10 +37,28 @@ func resourceArmSecurityCenterContact() *schema.Resource {
 			Delete: schema.DefaultTimeout(60 * time.Minute),
 		},
 
+		SchemaVersion: 1,
+		StateUpgraders: []schema.StateUpgrader{
+			{
+				Type:    ResourceArmSecurityCenterContactV0().CoreConfigSchema().ImpliedType(),
+				Upgrade: ResourceArmSecurityCenterContactUpgradeV0ToV1,
+				Version: 0,
+			},
+		},
+
 		Schema: map[string]*schema.Schema{
+			"name": {
+				Type:         schema.TypeString,
+				Optional:     true,
+				Default:      securityCenterContactName,
+				ForceNew:     true,
+				ValidateFunc: validation.StringIsNotEmpty,
+			},
+
 			"email": {
 				Type:         schema.TypeString,
 				Required:     true,
+				ForceNew:     true,
 				ValidateFunc: validation.StringIsNotEmpty,
 			},
 
@@ -70,7 +86,7 @@ func resourceArmSecurityCenterContactCreateUpdate(d *schema.ResourceData, meta i
 	ctx, cancel := timeouts.ForCreateUpdate(meta.(*clients.Client).StopContext, d)
 	defer cancel()
 
-	name := securityCenterContactName
+	name := d.Get("name").(string)
 
 	if d.IsNewResource() {
 		existing, err := client.Get(ctx, name)
@@ -108,19 +124,18 @@ func resourceArmSecurityCenterContactCreateUpdate(d *schema.ResourceData, meta i
 		if _, err := azuresdkhacks.CreateSecurityCenterContact(client, ctx, name, contact); err != nil {
 			return fmt.Errorf("Creating Security Center Contact: %+v", err)
 		}
-
-		resp, err := client.Get(ctx, name)
-		if err != nil {
-			return fmt.Errorf("Reading Security Center Contact: %+v", err)
-		}
-		if resp.ID == nil {
-			return fmt.Errorf("Security Center Contact ID is nil")
-		}
-
-		d.SetId(*resp.ID)
 	} else if _, err := client.Update(ctx, name, contact); err != nil {
 		return fmt.Errorf("Updating Security Center Contact: %+v", err)
 	}
+
+	resp, err := client.Get(ctx, name)
+	if err != nil {
+		return fmt.Errorf("Reading Security Center Contact: %+v", err)
+	}
+	if resp.ID == nil {
+		return fmt.Errorf("Security Center Contact ID is nil")
+	}
+	d.SetId(*resp.ID)
 
 	return resourceArmSecurityCenterContactRead(d, meta)
 }
@@ -130,9 +145,12 @@ func resourceArmSecurityCenterContactRead(d *schema.ResourceData, meta interface
 	ctx, cancel := timeouts.ForRead(meta.(*clients.Client).StopContext, d)
 	defer cancel()
 
-	name := securityCenterContactName
+	id, err := parse.SecurityCenterContactID(d.Id())
+	if err != nil {
+		return err
+	}
 
-	resp, err := client.Get(ctx, name)
+	resp, err := client.Get(ctx, id.Name)
 	if err != nil {
 		if utils.ResponseWasNotFound(resp.Response) {
 			log.Printf("[DEBUG] Security Center Subscription Contact was not found: %v", err)
@@ -149,6 +167,7 @@ func resourceArmSecurityCenterContactRead(d *schema.ResourceData, meta interface
 		d.Set("alert_notifications", properties.AlertNotifications == security.On)
 		d.Set("alerts_to_admins", properties.AlertsToAdmins == security.AlertsToAdminsOn)
 	}
+	d.Set("name", resp.Name)
 
 	return nil
 }
@@ -158,9 +177,12 @@ func resourceArmSecurityCenterContactDelete(d *schema.ResourceData, meta interfa
 	ctx, cancel := timeouts.ForDelete(meta.(*clients.Client).StopContext, d)
 	defer cancel()
 
-	name := securityCenterContactName
+	id, err := parse.SecurityCenterContactID(d.Id())
+	if err != nil {
+		return err
+	}
 
-	resp, err := client.Delete(ctx, name)
+	resp, err := client.Delete(ctx, id.Name)
 	if err != nil {
 		if utils.ResponseWasNotFound(resp) {
 			log.Printf("[DEBUG] Security Center Subscription Contact was not found: %v", err)
